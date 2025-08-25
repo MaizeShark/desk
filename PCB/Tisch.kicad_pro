@@ -633,6 +633,10 @@
     [
       "8799e7fc-64e3-47af-af75-3ea0ca673ce9",
       "QCC5125"
+    ],
+    [
+      "82faa504-891b-4906-a9e0-21d924b02c2b",
+      "SPdif"
     ]
   ],
   "text_variables": {}
