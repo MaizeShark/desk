@@ -4503,6 +4503,48 @@
 		)
 	)
 	(sheet
+		(at 148.59 13.97)
+		(size 15.24 10.16)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "8799e7fc-64e3-47af-af75-3ea0ca673ce9")
+		(property "Sheetname" "QCC5125"
+			(at 148.59 13.2584 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "QCC5125.kicad_sch"
+			(at 148.59 24.7146 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Tisch"
+				(path "/08b9944e-0e9a-4685-98da-9a654683b13c"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
 		(at 69.85 13.97)
 		(size 21.59 10.16)
 		(exclude_from_sim no)

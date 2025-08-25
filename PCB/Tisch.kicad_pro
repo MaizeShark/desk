@@ -598,7 +598,7 @@
     },
     "net_format_name": "",
     "page_layout_descr_file": "",
-    "plot_directory": "",
+    "plot_directory": "../../../Desktop/",
     "space_save_all_events": true,
     "spice_current_sheet_as_root": false,
     "spice_external_command": "spice \"%I\"",
@@ -629,6 +629,10 @@
     [
       "ff48eb25-49a8-4a3d-9e43-5005d547fdc4",
       "USB audio"
+    ],
+    [
+      "8799e7fc-64e3-47af-af75-3ea0ca673ce9",
+      "QCC5125"
     ]
   ],
   "text_variables": {}

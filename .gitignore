@@ -1,0 +1,18 @@
+# Ignore archive files and other large binaries
+*.zip
+*.rar
+*.apk
+*.xuv
+
+# --- IMPORTANT ---
+# Ignore the entire third-party SDK and toolchain directories
+# These should be installed separately as a project dependency.
+files/QCC5125/Bluetooth/
+files/QCC5125/BT STUFF/
+files/QCC5125/QCC3031/
+files/QCC5125/Qualcomm-_ADK6.4.0.43/
+
+# Add any other OS or editor specific files
+.vscode/
+.idea/
+*.DS_Store
