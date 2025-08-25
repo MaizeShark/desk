@@ -3938,6 +3938,48 @@
 		)
 	)
 	(sheet
+		(at 198.12 13.97)
+		(size 19.05 10.16)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "b2685b61-8a97-4dd9-bcf2-30d22dbde7f4")
+		(property "Sheetname" "ADC"
+			(at 198.12 13.2584 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "adc.kicad_sch"
+			(at 198.12 24.7146 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Tisch"
+				(path "/08b9944e-0e9a-4685-98da-9a654683b13c"
+					(page "8")
+				)
+			)
+		)
+	)
+	(sheet
 		(at 101.6 13.97)
 		(size 22.86 10.16)
 		(exclude_from_sim no)

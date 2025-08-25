@@ -637,6 +637,10 @@
     [
       "82faa504-891b-4906-a9e0-21d924b02c2b",
       "SPdif"
+    ],
+    [
+      "b2685b61-8a97-4dd9-bcf2-30d22dbde7f4",
+      "ADC"
     ]
   ],
   "text_variables": {}

@@ -1,18 +1,69 @@
-# Ignore archive files and other large binaries
+# ===================================================================
+# Editor- und Betriebssystem-spezifische Dateien
+# ===================================================================
+.vscode/
+.idea/
+*.DS_Store
+*~
+*.swp
+*.swo
+
+# ===================================================================
+# KiCad - PCB Design
+# ===================================================================
+# Temporäre und Backup-Dateien
+*.lck
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*-backups/
+\#auto_saved_files#
+
+# Cache-Dateien
+fp-info-cache
+
+# Log-Dateien
+*.log
+PCB/librarys/log_iotc.txt
+
+# Generierte Output-Dateien (Plotting, BOM, etc.)
+# Kommentiere aus, was du doch versionieren willst (z.B. PDFs für Releases)
+*.gbr
+*.ger
+*.drl
+*.pos
+*.rpt
+*.bom
+*.csv
+# *.pdf
+# *.svg
+# *.png
+
+
+# ===================================================================
+# Binärdateien, Archive und große Dumps
+# ===================================================================
 *.zip
 *.rar
 *.apk
 *.xuv
 
-# --- IMPORTANT ---
-# Ignore the entire third-party SDK and toolchain directories
-# These should be installed separately as a project dependency.
+
+# ===================================================================
+# Komplette Toolchains, SDKs und Binaries im "files" Ordner
+# Diese sollten als externe Abhängigkeiten behandelt werden.
+# ===================================================================
+
+# Ignoriere die kompletten Tool-Verzeichnisse
 files/QCC5125/Bluetooth/
 files/QCC5125/BT STUFF/
+files/QCC5125/Config/
 files/QCC5125/QCC3031/
 files/QCC5125/Qualcomm-_ADK6.4.0.43/
+files/QCC5125/HYT_TOOLS_3031_3034_5125_250422_EQ_V1/
 
-# Add any other OS or editor specific files
-.vscode/
-.idea/
-*.DS_Store
+# Ignoriere ausführbare Dateien (Executables)
+files/QCC5125/droid_gaia_ctrl
+files/QCC5125/GAIAControl
+
+# Ignoriere Analyse-Ergebnisse
+files/QCC5125/exe_analyse.csv
