@@ -1784,6 +1784,48 @@
 		)
 	)
 	(sheet
+		(at 209.55 60.96)
+		(size 27.94 19.05)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "245bb5b0-daf4-45b9-ad72-e6163f4a1a2a")
+		(property "Sheetname" "HID"
+			(at 209.55 60.2484 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "hid.kicad_sch"
+			(at 209.55 80.5946 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Tisch"
+				(path "/08b9944e-0e9a-4685-98da-9a654683b13c"
+					(page "13")
+				)
+			)
+		)
+	)
+	(sheet
 		(at 12.7 26.67)
 		(size 25.4 13.97)
 		(exclude_from_sim no)

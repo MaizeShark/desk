@@ -1,0 +1,134 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "4e84333a-ed75-4a38-ba9b-d100b228024c")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 115.57 19.05)
+		(size 29.21 19.05)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "21b245af-c3d8-4405-bdbd-4fdd89fa37ec")
+		(property "Sheetname" "Encoder"
+			(at 115.57 18.3384 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "encoder.kicad_sch"
+			(at 115.57 38.6846 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Tisch"
+				(path "/08b9944e-0e9a-4685-98da-9a654683b13c/245bb5b0-daf4-45b9-ad72-e6163f4a1a2a"
+					(page "16")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 16.51 17.78)
+		(size 27.94 17.78)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "32d7e3ce-7b62-40e2-8be1-57adbbb5983b")
+		(property "Sheetname" "ESP32 HID"
+			(at 16.51 17.0684 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "esp32_hid.kicad_sch"
+			(at 16.51 36.1446 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Tisch"
+				(path "/08b9944e-0e9a-4685-98da-9a654683b13c/245bb5b0-daf4-45b9-ad72-e6163f4a1a2a"
+					(page "14")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 57.15 17.78)
+		(size 31.75 16.51)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "63088da3-818f-4167-aa34-400e858a62be")
+		(property "Sheetname" "Display"
+			(at 57.15 17.0684 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "display.kicad_sch"
+			(at 57.15 34.8746 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "Tisch"
+				(path "/08b9944e-0e9a-4685-98da-9a654683b13c/245bb5b0-daf4-45b9-ad72-e6163f4a1a2a"
+					(page "15")
+				)
+			)
+		)
+	)
+)
