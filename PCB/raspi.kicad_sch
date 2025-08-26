@@ -2492,7 +2492,7 @@
 				)
 			)
 		)
-		(property "Footprint" "RASPBERRY_PI_ZERO_2_W:RASPBERRY_PI_ZERO_2_W"
+		(property "Footprint" "RASPBERRY_PI_ZERO_2_W:MODULE_RASPBERRY_PI_ZERO_2_W"
 			(at 148.59 91.44 0)
 			(effects
 				(font

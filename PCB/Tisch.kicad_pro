@@ -597,6 +597,14 @@
       "version": 1
     },
     "net_format_name": "",
+    "ngspice": {
+      "fix_include_paths": true,
+      "meta": {
+        "version": 0
+      },
+      "model_mode": 4,
+      "workbook_filename": ""
+    },
     "page_layout_descr_file": "",
     "plot_directory": "../../../Desktop/",
     "space_save_all_events": true,
@@ -641,6 +649,22 @@
     [
       "b2685b61-8a97-4dd9-bcf2-30d22dbde7f4",
       "ADC"
+    ],
+    [
+      "65f08156-5cea-4bee-ac55-4422dce27b25",
+      "PSUs"
+    ],
+    [
+      "16f41a41-4514-47a0-bd4c-0493405469a4",
+      "DAC"
+    ],
+    [
+      "0fcd2675-aad1-4a3e-afb4-c4776d2146f8",
+      "BM83"
+    ],
+    [
+      "967ac590-b037-4d83-851e-2568f749d042",
+      "ADAU1451"
     ]
   ],
   "text_variables": {}
