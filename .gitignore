@@ -67,3 +67,6 @@ files/QCC5125/GAIAControl
 
 # Ignoriere Analyse-Ergebnisse
 files/QCC5125/exe_analyse.csv
+
+
+UI/lvgl/
