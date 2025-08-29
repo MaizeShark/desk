@@ -79,7 +79,7 @@ def thumbnail_blur(thumbnail):
 def transform_thumbnail(im):
     # Resizes and rounds the corners of the image for thumbnail use
     try:
-        thumbnail = im.resize((160, 160), Image.Resampling.LANCZOS)
+        thumbnail = ImageOps.fit(im, (160, 160), Image.Resampling.LANCZOS)
         thumbnail_rounded = add_corners(thumbnail, 10)
         return thumbnail_rounded
     except Exception as e:
