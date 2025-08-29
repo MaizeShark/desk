@@ -1,0 +1,8 @@
+Pillow>=9.1.0
+aggdraw
+spotipy>=2.10.0
+python-dotenv
+urllib3>=2.0.0
+paho-mqtt
+jellyfin-apiclient-python
+# Ensure you use Python >= 3.7 in your environment
