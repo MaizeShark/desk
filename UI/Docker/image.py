@@ -125,7 +125,7 @@ def main_image(title, artist, thumbnail, background):
         im = Image.alpha_composite(im, scrim)
         draw = ImageDraw.Draw(im)
         try:
-            font = ImageFont.truetype("/home/niclas/Coding/desk/UI/Docker/Delius-Regular.ttf", size=14)
+            font = ImageFont.truetype("/app/Delius-Regular.ttf", size=14) # Change if not using Docker
         except IOError:
             print("Font file not found, using default font.")
             font = ImageFont.load_default() # Fallback
