@@ -1,0 +1,20 @@
+[Unit]
+Description=MPRIS Music Player to MQTT Bridge
+After=network-online.target dbus.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# -- Adjust these Paths if your user isnt pi! --
+ExecStart=/usr/bin/python3 /home/pi/mpris-mqtt-checker/checker.py
+WorkingDirectory=/home/pi/mpris-mqtt-checker
+
+Restart=on-failure
+RestartSec=5s
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

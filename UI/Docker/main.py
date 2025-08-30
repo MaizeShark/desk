@@ -26,7 +26,7 @@ from image import main_image, transform_background, transform_thumbnail
 load_dotenv()
 
 # -- General Config --
-IMAGE_DIRECTORY = "htdocs"  # We rename the folder to reflect its purpose
+IMAGE_DIRECTORY = "htdocs"
 POLL_INTERVAL_SECONDS = 30
 STATIC_FILENAME = "artwork.png"
 
@@ -47,7 +47,8 @@ MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST")
 MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", 1883))
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
-MQTT_TOPIC = os.getenv("MQTT_TOPIC", "spotify/image/latest")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "music/image")
+MQTT_STATUS_TOPIC = os.getenv("MQTT_STATUS_TOPIC", "music/status")
 
 # Ensure the target directory for HTTP files exists
 os.makedirs(IMAGE_DIRECTORY, exist_ok=True)
@@ -65,12 +66,12 @@ def image_creation(artwork_url, track_name, artist_names, mqtt_client):
 
     # --- CONSTRUCT AND PUBLISH ENHANCED MQTT MESSAGE ---
     try:
-        # Erzeuge den Zeitstempel
+        # Generate the timestamp
         timestamp = int(time.time())
                 
-        # Baue die Basis-URL und die Cache-Buster-URL
+        # Build the base URL and the cache-buster URL
         base_url = f"http://{HOST_IP}:{HTTP_PORT}/{STATIC_FILENAME}"
-        cache_busted_url = f"{base_url}?v={timestamp}" # z.B. .../spotify-artwork.png?v=16776789
+        cache_busted_url = f"{base_url}?v={timestamp}" # e.g. .../spotify-artwork.png?v=16776789
                 
         payload = {
             "url": cache_busted_url,
@@ -123,7 +124,7 @@ def spotify_api():
         return None
 
 
-# --- HTTP SERVER LOGIK ---
+# --- HTTP SERVER LOGIC ---
 def run_http_server():
     """Starts a simple, anonymous HTTP server in a dedicated thread."""
     
@@ -143,7 +144,7 @@ def jellyfin():
         return None
 
     client = JellyfinClient()
-    client.config.app('Jellyfin Status Skript', '1.0.0', 'Desk HID', 'desk-hid-device-001')
+    client.config.app('Jellyfin Status Script', '1.0.0', 'Desk HID', 'desk-hid-device-001')
     client.config.data["auth.ssl"] = False # Disable SSL verification if needed
     artwork_url = "https://placehold.co/400x400"
     item_id = None
@@ -210,33 +211,60 @@ def setup_mqtt_client():
         print(f"FATAL: MQTT credentials not found. Host='{broker_host}', User='{username}', Pass is set: {password is not None}")
         return None
 
-    # --- Unsere Diagnose-Funktionen ("Spione") nach dem neuen API v2 Standard ---
+    # --- Our diagnostic functions ("spies") according to the new API v2 standard ---
     def on_connect(client, userdata, flags, reason_code, properties):
-        """Callback for when the client connects to the broker (API v2)."""
-        if reason_code != 0:
+        if reason_code == 0:
+            """Callback for when the client connects to the broker (API v2)."""
+            print("Connected to MQTT broker successfully.")
+            print(f"Subscribing to topic: '{MQTT_STATUS_TOPIC}'")
+            client.subscribe(MQTT_STATUS_TOPIC)
+        else:
             print(f"Failed to connect to MQTT broker. Reason: {reason_code}")
+    
+    def on_message(client, userdata, msg):
+        payload_str = msg.payload.decode('utf-8')
+        print(f"MQTT Message received on topic '{msg.topic}': {payload_str}")
+        playback_status_check(client)
 
-    # --- Konfiguration des Clients ---
+    # --- Client configuration ---
     client_id = f'spotify-script-{socket.gethostname()}'
     print(f"Setting up MQTT client with Client ID: {client_id}...")
     
-    # Hier verwenden wir die empfohlene VERSION2
+    # Here we use the recommended VERSION2
     client = mqtt.Client(client_id=client_id, callback_api_version=mqtt.CallbackAPIVersion.VERSION2) # type: ignore
     
-    # Weisen Sie dem Client unsere "Spione" zu
+    # Assign our "spies" to the client
     client.on_connect = on_connect
+    client.on_message = on_message
 
     client.username_pw_set(username, password)
     try:
         broker_port = int(os.getenv("MQTT_BROKER_PORT", 1883))
         client.connect(broker_host, broker_port, 60) # type: ignore
         print(f"Attempting to connect to MQTT broker at {broker_host}...")
-        client.loop_start() # Die Netzwerkschleife starten
+        client.loop_start() # Start the network loop
         return client
     except Exception as e:
         print(f"FATAL: Could not even attempt to connect to MQTT broker: {e}")
         return None
 
+def playback_status_check(mqtt_client):
+    jelly = jellyfin()
+    print(f"Jellyfin playback info: {jelly}")
+    spotify = spotify_api()
+    print(f"Spotify playback info: {spotify}")
+    if jelly and not spotify:
+        artwork_url, track_name, artist_names = jelly
+        image_creation(artwork_url, track_name, artist_names, mqtt_client)
+    elif spotify and not jelly:
+        artwork_url, track_name, artist_names = spotify
+        image_creation(artwork_url, track_name, artist_names, mqtt_client)
+    elif spotify and jelly:
+        print("Both Spotify and Jellyfin report active playback. Prioritizing Spotify.")
+        artwork_url, track_name, artist_names = spotify
+        image_creation(artwork_url, track_name, artist_names, mqtt_client)
+    else:
+        print("No active playback found on either Spotify or Jellyfin. Skipping image creation and MQTT publish.")
 
 # --- MAIN EXECUTION BLOCK ---
 if __name__ == "__main__":
@@ -255,22 +283,7 @@ if __name__ == "__main__":
     http_thread.start()
     
     while turned_on:
-        jelly = jellyfin()
-        print(f"Jellyfin playback info: {jelly}")
-        spotify = spotify_api()
-        print(f"Spotify playback info: {spotify}")
-        if jelly and not spotify:
-            artwork_url, track_name, artist_names = jelly
-            image_creation(artwork_url, track_name, artist_names, mqtt_client)
-        elif spotify and not jelly:
-            artwork_url, track_name, artist_names = spotify
-            image_creation(artwork_url, track_name, artist_names, mqtt_client)
-        elif spotify and jelly:
-            print("Both Spotify and Jellyfin report active playback. Prioritizing Spotify.")
-            artwork_url, track_name, artist_names = spotify
-            image_creation(artwork_url, track_name, artist_names, mqtt_client)
-        else:
-            print("No active playback found on either Spotify or Jellyfin. Skipping image creation and MQTT publish.")
+        playback_status_check(mqtt_client)
 
         print(f"Waiting for {POLL_INTERVAL_SECONDS} seconds before next check...")
         time.sleep(POLL_INTERVAL_SECONDS)
