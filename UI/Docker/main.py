@@ -27,7 +27,7 @@ load_dotenv()
 
 # -- General Config --
 IMAGE_DIRECTORY = "htdocs"
-POLL_INTERVAL_SECONDS = 30
+POLL_INTERVAL_SECONDS = 45 # Would recommend at least 30 seconds to avoid rate limiting from Spotify
 STATIC_FILENAME = "artwork.png"
 
 # --- HID ---
