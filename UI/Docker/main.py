@@ -250,9 +250,7 @@ def setup_mqtt_client():
 
 def playback_status_check(mqtt_client):
     jelly = jellyfin()
-    print(f"Jellyfin playback info: {jelly}")
     spotify = spotify_api()
-    print(f"Spotify playback info: {spotify}")
     if jelly and not spotify:
         artwork_url, track_name, artist_names = jelly
         image_creation(artwork_url, track_name, artist_names, mqtt_client)
@@ -264,7 +262,22 @@ def playback_status_check(mqtt_client):
         artwork_url, track_name, artist_names = spotify
         image_creation(artwork_url, track_name, artist_names, mqtt_client)
     else:
-        print("No active playback found on either Spotify or Jellyfin. Skipping image creation and MQTT publish.")
+        print("No active playback found on either Spotify or Jellyfin.")
+        try:
+            # Generate the timestamp
+            timestamp = int(time.time())
+                    
+            payload = {
+                "url": f"http://{HOST_IP}:{HTTP_PORT}/{STATIC_FILENAME}?v={timestamp}",
+                "track": "Not Playing",
+                "artist": "Not Playing",
+                "timestamp": timestamp 
+            }
+                    
+            mqtt_client.publish(MQTT_TOPIC, json.dumps(payload), qos=1, retain=True)
+            print(f"Published JSON payload to MQTT topic '{MQTT_TOPIC}'")
+        except Exception as e:
+            print(f"Could not publish to MQTT: {e}")
 
 # --- MAIN EXECUTION BLOCK ---
 if __name__ == "__main__":
