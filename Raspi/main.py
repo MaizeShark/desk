@@ -33,13 +33,20 @@ def get_player_info_playerctl(player_short_name):
             shell=True, text=True, stderr=subprocess.DEVNULL
         ).strip()
         meta_output = subprocess.check_output(
-            f"playerctl -p {shlex.quote(player_short_name)} metadata xesam:title xesam:artist",
+            f"playerctl -p {shlex.quote(player_short_name)} metadata xesam:title xesam:artist mpris:artUrl",
             shell=True, text=True, stderr=subprocess.DEVNULL
         ).strip()
         lines = meta_output.split('\n')
         title = lines[0] if lines else 'Title not available'
         artist = lines[1] if len(lines) > 1 else 'Artist not available'
-        return {"status": status, "title": title, "artist": artist, "player": player_short_name}
+        album_art_url = lines[2] if len(lines) > 2 else ''
+        return {
+            "status": status,
+            "title": title,
+            "artist": artist,
+            "player": player_short_name,
+            "album_art_url": album_art_url
+        }
     except subprocess.CalledProcessError:
         return None
     except Exception as e:
@@ -58,7 +65,14 @@ def get_player_info(bus, service_name):
         if isinstance(artists, str):
             artists = [artists]
         artist_str = ', '.join(artists) if artists else 'Artist not available'
-        return {"status": status, "title": title, "artist": artist_str, "player": player_short_name}
+        album_art_url = meta.get('mpris:artUrl', '')
+        return {
+            "status": status,
+            "title": title,
+            "artist": artist_str,
+            "player": player_short_name,
+            "album_art_url": album_art_url
+        }
     except Exception:
         return get_player_info_playerctl(player_short_name)
 
@@ -92,7 +106,13 @@ def main_loop():
                 or next((p for p in players if p['status'] == 'Paused'), None) \
                 or next((p for p in players if p['status'] == 'Stopped'), None)
             payload_json = json.dumps(
-                active_player if active_player else {"status": "Stopped", "title": "", "artist": "", "player": "none"},
+                active_player if active_player else {
+                    "status": "Stopped",
+                    "title": "",
+                    "artist": "",
+                    "player": "none",
+                    "album_art_url": ""
+                },
                 ensure_ascii=False
             )
             if payload_json != last_published_json:
