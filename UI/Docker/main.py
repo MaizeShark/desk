@@ -224,7 +224,7 @@ def setup_mqtt_client():
     def on_message(client, userdata, msg):
         payload_str = msg.payload.decode('utf-8')
         print(f"MQTT Message received on topic '{msg.topic}': {payload_str}")
-        playback_status_check(client)
+        playback_status_check(client, payload_str)
 
     # --- Client configuration ---
     client_id = f'spotify-script-{socket.gethostname()}'
@@ -248,7 +248,7 @@ def setup_mqtt_client():
         print(f"FATAL: Could not even attempt to connect to MQTT broker: {e}")
         return None
 
-def playback_status_check(mqtt_client):
+def playback_status_check(mqtt_client, mqtt_status=None):
     jelly = jellyfin()
     spotify = spotify_api()
     if jelly and not spotify:
@@ -260,6 +260,13 @@ def playback_status_check(mqtt_client):
     elif spotify and jelly:
         print("Both Spotify and Jellyfin report active playback. Prioritizing Spotify.")
         artwork_url, track_name, artist_names = spotify
+        image_creation(artwork_url, track_name, artist_names, mqtt_client)
+    elif not spotify and not jelly and mqtt_status:
+        print("Spotify and Jellyfin are not playing, but received MQTT status update.")
+        mqtt_data = json.loads(mqtt_status)
+        track_name = mqtt_data.get('title', 'Unknown Title')
+        artist_names = mqtt_data.get('artist', 'Unknown Artist')
+        artwork_url = mqtt_data.get('album_art_url', "https://placehold.co/400x400?text=No+image")
         image_creation(artwork_url, track_name, artist_names, mqtt_client)
     else:
         print("No active playback found on either Spotify or Jellyfin.")
