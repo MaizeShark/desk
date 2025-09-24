@@ -134,7 +134,7 @@ def run_http_server():
             super().__init__(*args, directory=IMAGE_DIRECTORY, **kwargs)
 
     address = ("0.0.0.0", HTTP_PORT)
-    with socketserver.TCPServer(address, Handler) as httpd:
+    with socketserver.ThreadingTCPServer(address, Handler) as httpd:
         print(f"Starting anonymous HTTP server on port {HTTP_PORT}, serving files from '{IMAGE_DIRECTORY}'...")
         httpd.serve_forever()
 
