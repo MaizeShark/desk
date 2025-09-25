@@ -7,16 +7,15 @@ import threading
 import json
 from dotenv import load_dotenv
 from PIL import Image
-from typing import Optional
+from typing import Optional, Tuple
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-
+    
 import http.server
 import socketserver
 
 import paho.mqtt.client as mqtt
-import socket
 
 from jellyfin_apiclient_python import JellyfinClient
 
@@ -34,6 +33,8 @@ JELLYFIN_POLL_INTERVAL_SECONDS = 15 # Jellyfin is local, can be polled more ofte
 STATIC_FILENAME = "artwork.png"
 
 # --- HID ---
+# This variable is used to control the main loop, but it's better practice
+# to handle loop termination via try/except KeyboardInterrupt.
 turned_on = True
 
 # -- Server Config (from .env) --
@@ -61,10 +62,10 @@ os.makedirs(IMAGE_DIRECTORY, exist_ok=True)
 
 class PlaybackManager:
     """
-    A class to manage playback state, API polling, and image generation.
-    This replaces all the global state variables and the old logic.
+    Manages playback state, API polling, and image generation by encapsulating
+    all logic and state, removing the need for global variables.
     """
-    # --- API Clients (with type hints) ---
+    # --- Type Hints for API Clients ---
     spotify_client: Optional[spotipy.Spotify]
     jellyfin_client: Optional[JellyfinClient]
     mqtt_client: Optional[mqtt.Client]
@@ -75,20 +76,24 @@ class PlaybackManager:
         self.jellyfin_client = jellyfin_client
         self.mqtt_client = mqtt_client
 
-        # --- State Management (formerly global variables) ---
-        self.last_processed_track = None
-        self.last_processed_artist = None
+        # --- State Management ---
+        self.last_processed_track: Optional[str] = None
+        self.last_processed_artist: Optional[str] = None
         
-        self.last_mqtt_title = None
-        self.last_mqtt_artist = None
+        # State for MQTT trigger logic
+        self.last_mqtt_title: Optional[str] = None
+        self.last_mqtt_artist: Optional[str] = None
 
-        self.last_spotify_poll_time = 0
-        self.last_jellyfin_poll_time = 0
+        # Timers for polling intervals
+        self.last_spotify_poll_time: float = 0
+        self.last_jellyfin_poll_time: float = 0
 
-        self.spotify_data_cache = None
-        self.jellyfin_data_cache = None
+        # Caches to hold the latest data from polls
+        self.spotify_data_cache: Optional[Tuple[str, str, str]] = None
+        self.jellyfin_data_cache: Optional[Tuple[str, str, str]] = None
         
-        self._force_poll = True  # Poll immediately on the first run
+        # Flag to force an immediate poll on the next cycle
+        self._force_poll: bool = True
 
     # --- Polling Logic ---
     def _poll_spotify(self):
@@ -118,25 +123,23 @@ class PlaybackManager:
         if DEBUG: 
             print("Polling Jellyfin API...")
         try:
-            # Simplified logic from your original function
             sessions = self.jellyfin_client.jellyfin.get_sessions()
             active_session_data = None
             for session in sessions:
-                if 'NowPlayingItem' in session:
+                if 'NowPlayingItem' in session and session.get('IsActive', False) and not session.get('IsPaused', False):
                     now_playing = session.get('NowPlayingItem')
-                    item_name = now_playing.get('Name', 'Unknown Title')
-                    artist_info = "Unknown Artist"
-                    artwork_url = "https://placehold.co/400x400"
-                    
                     if now_playing.get('Type') == 'Audio':
+                        item_name = now_playing.get('Name', 'Unknown Title')
                         artists_list = now_playing.get('ArtistItems', [])
-                        artist_info = ', '.join([a['Name'] for a in artists_list])
+                        artist_info = ', '.join([a['Name'] for a in artists_list]) or "Unknown Artist"
+                        
+                        artwork_url = "https://placehold.co/400x400" # Default artwork
                         album_id = now_playing.get('AlbumId')
                         if album_id:
                             artwork_url = self.jellyfin_client.jellyfin.artwork(album_id, 'Primary', max_width=400)
                         
                         active_session_data = (artwork_url, item_name, artist_info)
-                        break # Found an active session
+                        break # Found an active audio session
             
             self.jellyfin_data_cache = active_session_data
         except Exception as e:
@@ -146,10 +149,15 @@ class PlaybackManager:
             self.last_jellyfin_poll_time = time.time()
 
     # --- Image and MQTT Publishing Logic ---
-    def _create_image_and_publish(self, artwork_url, track_name, artist_names):
-        """Generates image and publishes the update to MQTT."""
-        if (track_name, artist_names) == (self.last_processed_track, self.last_processed_artist) and DEBUG:
-            print("Track info unchanged, skipping image generation.")
+    def _process_playback_data(self, artwork_url: str, track_name: str, artist_names: str):
+        """
+        Generates image and publishes the update to MQTT, but only if the
+        track information has actually changed.
+        """
+        # --- OPTIMIZATION: Check if track has changed before regenerating ---
+        if (track_name, artist_names) == (self.last_processed_track, self.last_processed_artist):
+            if DEBUG:
+                print("Track info unchanged, skipping image generation.")
             return
 
         print(f"New track detected: '{track_name}' by '{artist_names}'. Generating image...")
@@ -184,7 +192,7 @@ class PlaybackManager:
 
     # --- Main Control Logic ---
     def handle_mqtt_status_update(self, _client, _userdata, msg):
-        """This is the callback for the MQTT client."""
+        """Callback for the MQTT client to trigger a forced poll."""
         try:
             payload_str = msg.payload.decode('utf-8')
             payload = json.loads(payload_str)
@@ -194,7 +202,7 @@ class PlaybackManager:
             new_title = payload.get('title')
             new_artist = payload.get('artist')
 
-            # **THE CORE REQUIREMENT**: Only force a poll if track or artist changed
+            # --- IMPLEMENTED FEATURE: Force a poll if track or artist changed ---
             if new_title != self.last_mqtt_title or new_artist != self.last_mqtt_artist:
                 print(">>> Significant change in MQTT status detected. Forcing poll on next update cycle.")
                 self._force_poll = True
@@ -217,7 +225,7 @@ class PlaybackManager:
             print("Force poll triggered.")
             self._poll_spotify()
             self._poll_jellyfin()
-            self._force_poll = False # Reset the flag
+            self._force_poll = False # Reset the flag after polling
         else:
             if time_to_poll_spotify:
                 self._poll_spotify()
@@ -228,16 +236,19 @@ class PlaybackManager:
         # Priority: Spotify > Jellyfin > Nothing
         if self.spotify_data_cache:
             artwork_url, track, artist = self.spotify_data_cache
-            self._create_image_and_publish(artwork_url, track, artist)
+            self._process_playback_data(artwork_url, track, artist)
         elif self.jellyfin_data_cache:
             artwork_url, track, artist = self.jellyfin_data_cache
-            self._create_image_and_publish(artwork_url, track, artist)
+            self._process_playback_data(artwork_url, track, artist)
         else:
-            # If nothing is playing, ensure we reflect that state
-            self._create_image_and_publish("https://placehold.co/400x400?text=Not+Playing", "Not Playing", "")
+            # --- FEATURE: Handle "Not Playing" state explicitly ---
+            self._process_playback_data(
+                "https://placehold.co/400x400/222326/FFFFFF?text=Not+Playing",
+                "Not Playing", ""
+            )
 
 
-# --- SETUP FUNCTIONS (Mostly unchanged) ---
+# --- SETUP FUNCTIONS (Mostly unchanged but adapted for the Manager class) ---
 def setup_spotify_client():
     try:
         scope = "user-read-playback-state,user-read-currently-playing"
@@ -267,7 +278,7 @@ def setup_jellyfin_client():
         print(f"An error occurred during Jellyfin setup: {e}")
         return None
 
-def setup_mqtt_client(manager):
+def setup_mqtt_client(manager: PlaybackManager) -> Optional[mqtt.Client]:
     if not all([MQTT_BROKER_HOST, MQTT_USERNAME, MQTT_PASSWORD]):
         print("FATAL: MQTT credentials not found.")
         return None
@@ -279,16 +290,15 @@ def setup_mqtt_client(manager):
         else:
             print(f"Failed to connect to MQTT broker. Reason: {reason_code}")
     
-    # The on_message callback is now linked to our manager instance
-    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2) # type: ignore
+    # The on_message callback is now linked to our manager instance method
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
     client.on_message = manager.handle_mqtt_status_update
     client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 
     try:
         if MQTT_BROKER_HOST is None:
-            print("FATAL: MQTT_BROKER_HOST is not set.")
-            return None
+            raise ValueError("MQTT_BROKER_HOST is not set.")
         client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, 60)
         client.loop_start()
         return client
@@ -313,7 +323,6 @@ if __name__ == "__main__":
     jellyfin_client = setup_jellyfin_client()
     
     # 2. Create the manager instance (pass None for clients that failed)
-    # The manager's methods are designed to handle None clients gracefully.
     playback_manager = PlaybackManager(spotify_client, jellyfin_client, None)
 
     # 3. Setup MQTT client and link it to the manager
@@ -322,14 +331,14 @@ if __name__ == "__main__":
         print("Exiting due to MQTT connection failure.")
         exit(1)
     
-    # Now, give the manager instance the actual MQTT client
+    # 4. Now that the client exists, assign it to the manager instance
     playback_manager.mqtt_client = mqtt_client
     
-    # 4. Start the HTTP server in a background thread
+    # 5. Start the HTTP server in a background thread
     http_thread = threading.Thread(target=run_http_server, daemon=True)
     http_thread.start()
     
-    # 5. Main application loop
+    # 6. Main application loop
     print("\n--- Starting Main Loop ---")
     try:
         while turned_on:
