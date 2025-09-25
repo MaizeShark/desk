@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-    
+
 import http.server
 import socketserver
 
@@ -99,23 +99,53 @@ class PlaybackManager:
     def _poll_spotify(self):
         if not self.spotify_client:
             return
-        if DEBUG: 
+        if DEBUG:
             print("Polling Spotify API...")
-        try:
-            results = self.spotify_client.current_playback()
-            if results and results.get('is_playing'):
-                track_item = results['item']
-                artwork_url = track_item['album']['images'][0]['url']
-                track_name = track_item['name']
-                artist_names = ', '.join([artist['name'] for artist in track_item['artists']])
-                self.spotify_data_cache = (artwork_url, track_name, artist_names)
-            else:
-                self.spotify_data_cache = None # Nothing is playing
-        except Exception as e:
-            print(f"Error polling Spotify: {e}")
+
+        retries = 3
+        for attempt in range(retries):
+            try:
+                results = self.spotify_client.current_playback()
+                if results and results.get('is_playing'):
+                    track_item = results['item']
+                    artwork_url = track_item['album']['images'][0]['url']
+                    track_name = track_item['name']
+                    artist_names = ', '.join([artist['name'] for artist in track_item['artists']])
+                    self.spotify_data_cache = (artwork_url, track_name, artist_names)
+                else:
+                    self.spotify_data_cache = None  # Nothing is playing
+                
+                # If successful, break out of the loop
+                break
+
+            except spotipy.exceptions.SpotifyException as e:
+                if e.http_status == 429:
+                    retry_after = e.headers.get('Retry-After')
+                    if retry_after:
+                        wait_time = int(retry_after)
+                        print(f"Spotify API rate limited. Retrying after {wait_time} seconds.")
+                        time.sleep(wait_time)
+                    else:
+                        # No Retry-After header, use exponential backoff
+                        wait_time = 2 ** attempt
+                        print(f"Spotify API rate limited. Retrying in {wait_time} seconds (exponential backoff).")
+                        time.sleep(wait_time)
+                else:
+                    # For other Spotify exceptions, log and don't retry
+                    print(f"Error polling Spotify: {e}")
+                    self.spotify_data_cache = None
+                    break
+            except Exception as e:
+                # For non-Spotify exceptions, log and don't retry
+                print(f"Error polling Spotify: {e}")
+                self.spotify_data_cache = None
+                break
+        else:
+            # This block executes if the loop completes without a break (i.e., all retries failed)
+            print("Failed to poll Spotify after several retries.")
             self.spotify_data_cache = None
-        finally:
-            self.last_spotify_poll_time = time.time()
+        
+        self.last_spotify_poll_time = time.time()
 
     def _poll_jellyfin(self):
         if not self.jellyfin_client:
