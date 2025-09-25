@@ -300,16 +300,20 @@ def playback_status_check(mqtt_client, mqtt_status=None):
     now = time.time()
 
     # Rate-limited polling for Spotify
-    if now - last_spotify_poll_time > SPOTIFY_POLL_INTERVAL_SECONDS:
+    if now - last_spotify_poll_time >= SPOTIFY_POLL_INTERVAL_SECONDS:
         print("Polling Spotify API...")
         spotify_data_cache = spotify_api()
         last_spotify_poll_time = now
+    else:
+        print(f"Skipping Spotify poll. Last polled {now - last_spotify_poll_time:.1f} seconds ago.")
 
     # Rate-limited polling for Jellyfin
-    if now - last_jellyfin_poll_time > JELLYFIN_POLL_INTERVAL_SECONDS:
+    if now - last_jellyfin_poll_time >= JELLYFIN_POLL_INTERVAL_SECONDS:
         print("Polling Jellyfin API...")
         jellyfin_data_cache = jellyfin()
         last_jellyfin_poll_time = now
+    else:
+        print(f"Skipping Jellyfin poll. Last polled {now - last_jellyfin_poll_time:.1f} seconds ago.")
 
     jelly = jellyfin_data_cache
     spotify = spotify_data_cache
