@@ -15,7 +15,7 @@ MQTT_BROKER_PORT = 1883
 MQTT_USERNAME = "mqtt" # put your broker username here
 MQTT_PASSWORD = "mqtt"  # put your broker password here
 MQTT_TOPIC = "music/status"
-CLIENT_ID = "mpris_status_checker_pi"
+CLIENT_ID = "ubuntu_pc"
 CHECK_INTERVAL_SECONDS = 1
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -40,12 +40,31 @@ def get_player_info_playerctl(player_short_name):
         title = lines[0] if lines else 'Title not available'
         artist = lines[1] if len(lines) > 1 else 'Artist not available'
         album_art_url = lines[2] if len(lines) > 2 else ''
+        # Get the length of the song (in microseconds) and the current position
+        try:
+            length_output = subprocess.check_output(
+                f"playerctl -p {shlex.quote(player_short_name)} metadata mpris:length",
+                shell=True, text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            length = int(length_output) // 1000000 if length_output.isdigit() else None
+        except Exception:
+            length = None
+        try:
+            position_output = subprocess.check_output(
+                f"playerctl -p {shlex.quote(player_short_name)} position",
+                shell=True, text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            elapsed = int(float(position_output))
+        except Exception:
+            elapsed = None
         return {
             "status": status,
             "title": title,
             "artist": artist,
-            "player": player_short_name,
-            "album_art_url": album_art_url
+            "player": "ubuntu_pc",
+            "album_art_url": album_art_url,
+            "length": length,
+            "elapsed": elapsed
         }
     except subprocess.CalledProcessError:
         return None
@@ -66,12 +85,20 @@ def get_player_info(bus, service_name):
             artists = [artists]
         artist_str = ', '.join(artists) if artists else 'Artist not available'
         album_art_url = meta.get('mpris:artUrl', '')
+        length = meta.get('mpris:length')
+        length = int(length) // 1000000 if length else None
+        try:
+            elapsed = int(props.Position) // 1000000 if hasattr(props, 'Position') else None
+        except Exception:
+            elapsed = None
         return {
             "status": status,
             "title": title,
             "artist": artist_str,
-            "player": player_short_name,
-            "album_art_url": album_art_url
+            "player": "Raspi",
+            "album_art_url": album_art_url,
+            "length": length,
+            "elapsed": elapsed
         }
     except Exception:
         return get_player_info_playerctl(player_short_name)
@@ -110,8 +137,10 @@ def main_loop():
                     "status": "Stopped",
                     "title": "",
                     "artist": "",
-                    "player": "none",
-                    "album_art_url": ""
+                    "player": "Raspi",
+                    "album_art_url": "",
+                    "length": None,
+                    "elapsed": None
                 },
                 ensure_ascii=False
             )

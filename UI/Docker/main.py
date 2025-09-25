@@ -27,7 +27,9 @@ load_dotenv()
 
 # -- General Config --
 IMAGE_DIRECTORY = "htdocs"
-POLL_INTERVAL_SECONDS = 45 # Would recommend at least 30 seconds to avoid rate limiting from Spotify
+POLL_INTERVAL_SECONDS = 1 # Run every second
+SPOTIFY_POLL_INTERVAL_SECONDS = 30
+JELLYFIN_POLL_INTERVAL_SECONDS = 5
 STATIC_FILENAME = "artwork.png"
 
 # --- HID ---
@@ -50,53 +52,107 @@ MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "music/image")
 MQTT_STATUS_TOPIC = os.getenv("MQTT_STATUS_TOPIC", "music/status")
 
+last_track = None
+last_artist = None
+last_artwork_url = None
+
+# --- API CLIENTS ---
+spotify_client = None
+jellyfin_client = None
+
+# --- Caching and Rate Limiting ---
+last_spotify_poll_time = 0
+last_jellyfin_poll_time = 0
+spotify_data_cache = None
+jellyfin_data_cache = None
+
+
 # Ensure the target directory for HTTP files exists
 os.makedirs(IMAGE_DIRECTORY, exist_ok=True)
 
-def image_creation(artwork_url, track_name, artist_names, mqtt_client):
-    global STATIC_FILENAME
-    im = Image.open(urllib.request.urlopen(artwork_url))
-    background = transform_background(im)
-    thumbnail = transform_thumbnail(im)
-    im_txt = main_image(track_name, artist_names, thumbnail, background)
-            
-    image_path = os.path.join(IMAGE_DIRECTORY, STATIC_FILENAME)
-    im_txt.save(image_path)
-    print(f"Image successfully saved/overwritten as '{image_path}'")
-
-    # --- CONSTRUCT AND PUBLISH ENHANCED MQTT MESSAGE ---
+def setup_spotify_client():
+    global spotify_client
     try:
-        # Generate the timestamp
-        timestamp = int(time.time())
-                
-        # Build the base URL and the cache-buster URL
-        base_url = f"http://{HOST_IP}:{HTTP_PORT}/{STATIC_FILENAME}"
-        cache_busted_url = f"{base_url}?v={timestamp}" # e.g. .../spotify-artwork.png?v=16776789
-                
-        payload = {
-            "url": cache_busted_url,
-            "track": track_name,
-            "artist": artist_names,
-            "timestamp": timestamp 
-        }
-                
-        mqtt_client.publish(MQTT_TOPIC, json.dumps(payload), qos=1, retain=True)
-        print(f"Published JSON payload to MQTT topic '{MQTT_TOPIC}'")
+        scope = "user-read-playback-state,user-read-currently-playing"
+        spotify_client = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, cache_path="./.cache"))
+        print("Spotify client initialized successfully.")
     except Exception as e:
-        print(f"Could not publish to MQTT: {e}")
+        print(f"Could not initialize Spotify client: {e}")
+
+def setup_jellyfin_client():
+    global jellyfin_client
+    if not all([JELLYFIN_URL, JELLY_USERNAME, JELLY_PASSWORD]):
+        print(f"INFO: Jellyfin credentials not found. Skipping Jellyfin setup.")
+        return
+
+    try:
+        client = JellyfinClient()
+        client.config.app('Jellyfin Status Script', '1.0.0', 'Desk HID', 'desk-hid-device-001')
+        client.config.data["auth.ssl"] = False
+        client.auth.connect_to_address(JELLYFIN_URL)
+        credentials = client.auth.login(JELLYFIN_URL, JELLY_USERNAME, JELLY_PASSWORD)
+        if credentials:
+            jellyfin_client = client
+            print("Jellyfin client logged in successfully.")
+        else:
+            print("FATAL: Jellyfin login failed. Please check your credentials.")
+    except Exception as e:
+        print(f"An error occurred during Jellyfin setup: {e}")
+
+
+def image_creation(artwork_url, track_name, artist_names, mqtt_client):
+    global last_artwork_url, last_track, last_artist
+    if (artwork_url, track_name, artist_names) != (last_artwork_url, last_track, last_artist):
+        print("New track detected, generating image and publishing to MQTT...")
+        last_artwork_url = artwork_url
+        last_track = track_name
+        last_artist = artist_names
+        global STATIC_FILENAME
+        im = Image.open(urllib.request.urlopen(artwork_url))
+        background = transform_background(im)
+        thumbnail = transform_thumbnail(im)
+        im_txt = main_image(track_name, artist_names, thumbnail, background)
+                
+        image_path = os.path.join(IMAGE_DIRECTORY, STATIC_FILENAME)
+        im_txt.save(image_path)
+        print(f"Image successfully saved/overwritten as '{image_path}'")
+
+        # --- CONSTRUCT AND PUBLISH ENHANCED MQTT MESSAGE ---
+        try:
+            # Generate the timestamp
+            timestamp = int(time.time())
+                    
+            # Build the base URL and the cache-buster URL
+            base_url = f"http://{HOST_IP}:{HTTP_PORT}/{STATIC_FILENAME}"
+            cache_busted_url = f"{base_url}?v={timestamp}" # e.g. .../spotify-artwork.png?v=16776789
+                    
+            payload = {
+                "url": cache_busted_url,
+                "track": track_name,
+                "artist": artist_names,
+                "timestamp": timestamp 
+            }
+                    
+            mqtt_client.publish(MQTT_TOPIC, json.dumps(payload), qos=1, retain=True)
+            print(f"Published JSON payload to MQTT topic '{MQTT_TOPIC}'")
+        except Exception as e:
+            print(f"Could not publish to MQTT: {e}")
+    else:
+        print("Track and artwork unchanged, skipping image generation and MQTT publish.")
 
 def spotify_api():
     """Checks Spotify, generates ONE image, and publishes a JSON payload to MQTT."""
+    if not spotify_client:
+        return None
+    
     print("Checking current Spotify track...")
     
     artwork_url="https://placehold.co/400x400"
     track_name="Unknown Title"
     artist_names="Unknown Artist"
     
-    scope = "user-read-playback-state,user-read-currently-playing"
     try:
-        sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, cache_path="./.cache"))
-        results = sp.current_playback()
+        results = spotify_client.current_playback()
 
         if results and results.get('is_playing'):
             track_item = results['item']
@@ -139,25 +195,15 @@ def run_http_server():
         httpd.serve_forever()
 
 def jellyfin():
-    if not all([JELLYFIN_URL, JELLY_USERNAME, JELLY_PASSWORD]):
-        print(f"FATAL: Jellyfin credentials not found. Host='{JELLYFIN_URL}', User='{JELLY_USERNAME}', Pass is set: {JELLY_PASSWORD is not None}")
+    if not jellyfin_client:
         return None
 
-    client = JellyfinClient()
-    client.config.app('Jellyfin Status Script', '1.0.0', 'Desk HID', 'desk-hid-device-001')
-    client.config.data["auth.ssl"] = False # Disable SSL verification if needed
     artwork_url = "https://placehold.co/400x400"
     item_id = None
     item_name = "Unknown Title"
     artist_info = "Unknown Artist"
     try:
-        client.auth.connect_to_address(JELLYFIN_URL)
-        credentials = client.auth.login(JELLYFIN_URL, JELLY_USERNAME, JELLY_PASSWORD)
-        if not credentials:
-            print("FATAL: Jellyfin login failed. Please check your credentials.")
-            return None
-
-        sessions = client.jellyfin.get_sessions()
+        sessions = jellyfin_client.jellyfin.get_sessions()
         if not sessions:
             print("No active playback sessions found on Jellyfin.")
             return None
@@ -182,14 +228,14 @@ def jellyfin():
                     album_id = now_playing.get('AlbumId')
                     if album_id:
                         print(f"Fetching artwork for album ID: {album_id}")
-                        artwork_url = client.jellyfin.artwork(album_id, 'Primary', max_width=400)
+                        artwork_url = jellyfin_client.jellyfin.artwork(album_id, 'Primary', max_width=400)
                     elif not album_id and item_id:
                         print(f"No album ID found, falling back to item ID: {item_id}")
-                        artwork_url = client.jellyfin.artwork(item_id, 'Primary', max_width=400)
+                        artwork_url = jellyfin_client.jellyfin.artwork(item_id, 'Primary', max_width=400)
                 else:
                     if item_id:
                         print(f"Fetching artwork for item ID: {item_id}")
-                        artwork_url = client.jellyfin.artwork(item_id, 'Primary', max_width=400)
+                        artwork_url = jellyfin_client.jellyfin.artwork(item_id, 'Primary', max_width=400)
                 
                 return (
                     artwork_url,
@@ -249,8 +295,25 @@ def setup_mqtt_client():
         return None
 
 def playback_status_check(mqtt_client, mqtt_status=None):
-    jelly = jellyfin()
-    spotify = spotify_api()
+    global last_spotify_poll_time, last_jellyfin_poll_time, spotify_data_cache, jellyfin_data_cache
+
+    now = time.time()
+
+    # Rate-limited polling for Spotify
+    if now - last_spotify_poll_time > SPOTIFY_POLL_INTERVAL_SECONDS:
+        print("Polling Spotify API...")
+        spotify_data_cache = spotify_api()
+        last_spotify_poll_time = now
+
+    # Rate-limited polling for Jellyfin
+    if now - last_jellyfin_poll_time > JELLYFIN_POLL_INTERVAL_SECONDS:
+        print("Polling Jellyfin API...")
+        jellyfin_data_cache = jellyfin()
+        last_jellyfin_poll_time = now
+
+    jelly = jellyfin_data_cache
+    spotify = spotify_data_cache
+    
     if jelly and not spotify:
         artwork_url, track_name, artist_names = jelly
         image_creation(artwork_url, track_name, artist_names, mqtt_client)
@@ -291,6 +354,9 @@ if __name__ == "__main__":
     if not HOST_IP:
         print("FATAL: HOST_IP environment variable is not set. This is required to build correct URLs.")
         exit(1)
+
+    setup_spotify_client()
+    setup_jellyfin_client()
 
     mqtt_client = setup_mqtt_client()
     if not mqtt_client:

@@ -36,7 +36,7 @@ A simple but robust Python service that monitors the status of music players on 
         ```
     -   **playerctl:**
         ```bash
-        # For Debian/Ubuntu
+        # For Debian/Ubuntu/RaspiOS
         sudo apt update && sudo apt install playerctl
         ```
 
