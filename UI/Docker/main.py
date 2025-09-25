@@ -65,6 +65,9 @@ class PlaybackManager:
     Manages playback state, API polling, and image generation by encapsulating
     all logic and state, removing the need for global variables.
     """
+    # --- Constants ---
+    SPOTIFY_API_RETRY_COUNT = 3 # Number of retries for Spotify API calls when rate limited
+
     # --- Type Hints for API Clients ---
     spotify_client: Optional[spotipy.Spotify]
     jellyfin_client: Optional[JellyfinClient]
@@ -102,7 +105,7 @@ class PlaybackManager:
         if DEBUG:
             print("Polling Spotify API...")
 
-        retries = 3
+        retries = self.SPOTIFY_API_RETRY_COUNT
         for attempt in range(retries):
             try:
                 results = self.spotify_client.current_playback()
@@ -120,7 +123,9 @@ class PlaybackManager:
 
             except spotipy.exceptions.SpotifyException as e:
                 if e.http_status == 429:
-                    retry_after = e.headers.get('Retry-After')
+                    retry_after = None
+                    if hasattr(e, 'headers') and e.headers is not None:
+                        retry_after = e.headers.get('Retry-After')
                     if retry_after:
                         wait_time = int(retry_after)
                         print(f"Spotify API rate limited. Retrying after {wait_time} seconds.")
