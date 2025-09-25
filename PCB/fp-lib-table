@@ -2,4 +2,5 @@
   (version 7)
   (lib (name "RASPBERRY_PI_ZERO_2_W")(type "KiCad")(uri "${KIPRJMOD}/librarys/RASPBERRY_PI_ZERO_2_W.pretty")(options "")(descr ""))
   (lib (name "footprints")(type "KiCad")(uri "${KIPRJMOD}/librarys/footprints.pretty")(options "")(descr ""))
+  (lib (name "4.0inch_48P_0.8mm")(type "KiCad")(uri "/home/niclas/Downloads/altium2kicad/4.0inch_48P_0.8mm.pretty")(options "")(descr ""))
 )

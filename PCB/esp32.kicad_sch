@@ -4374,7 +4374,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "0.1uF"
+		(property "Value" "10uF"
 			(at 140.208 56.388 0)
 			(effects
 				(font
@@ -4642,7 +4642,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "ESP32-S3-WROOM-1"
+		(property "Value" "ESP32-S3-WROOM-1U-N8"
 			(at 155.956 70.612 0)
 			(effects
 				(font
