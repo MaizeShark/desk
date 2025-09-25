@@ -105,7 +105,7 @@ def get_player_info(bus, service_name):
 
 def main_loop():
     logging.info("Music checker service starting.")
-    mqttc = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, client_id=CLIENT_ID)
+    mqttc = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, client_id=CLIENT_ID) # type: ignore
     mqttc.on_connect = on_connect
     if MQTT_USERNAME and MQTT_PASSWORD:
         mqttc.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
