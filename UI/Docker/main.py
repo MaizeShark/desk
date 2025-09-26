@@ -109,7 +109,7 @@ class PlaybackManager:
         for attempt in range(retries):
             try:
                 results = self.spotify_client.current_playback()
-                if results and results.get('is_playing'):
+                if results and results.get('is_playing') and results.get('item'):
                     track_item = results['item']
                     artwork_url = track_item['album']['images'][0]['url']
                     track_name = track_item['name']
@@ -200,7 +200,13 @@ class PlaybackManager:
         self.last_processed_artist = artist_names
 
         try:
-            im = Image.open(urllib.request.urlopen(artwork_url))
+            req = urllib.request.Request(
+                artwork_url, 
+                headers={'User-Agent': 'Mozilla/5.0'}
+            )
+            with urllib.request.urlopen(req) as response:
+                im = Image.open(response)
+
             background = transform_background(im)
             thumbnail = transform_thumbnail(im)
             im_txt = main_image(track_name, artist_names, thumbnail, background)
@@ -326,7 +332,7 @@ def setup_mqtt_client(manager: PlaybackManager) -> Optional[mqtt.Client]:
             print(f"Failed to connect to MQTT broker. Reason: {reason_code}")
     
     # The on_message callback is now linked to our manager instance method
-    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2) # type: ignore
     client.on_connect = on_connect
     client.on_message = manager.handle_mqtt_status_update
     client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
