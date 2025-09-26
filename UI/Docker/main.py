@@ -3,8 +3,10 @@
 import os
 import time
 import urllib.request
+import urllib.error
 import threading
 import json
+import ssl
 from dotenv import load_dotenv
 from PIL import Image
 from typing import Optional, Tuple
@@ -19,7 +21,6 @@ import paho.mqtt.client as mqtt
 
 from jellyfin_apiclient_python import JellyfinClient
 
-# --- CUSTOM MODULE IMPORT ---
 from image import main_image, transform_background, transform_thumbnail
 
 # --- CONFIGURATION ---
@@ -94,6 +95,7 @@ class PlaybackManager:
         # Caches to hold the latest data from polls
         self.spotify_data_cache: Optional[Tuple[str, str, str]] = None
         self.jellyfin_data_cache: Optional[Tuple[str, str, str]] = None
+        self.mqtt_data_cache: Optional[Tuple[str, str, str]] = None
         
         # Flag to force an immediate poll on the next cycle
         self._force_poll: bool = True
@@ -200,13 +202,31 @@ class PlaybackManager:
         self.last_processed_artist = artist_names
 
         try:
-            req = urllib.request.Request(
-                artwork_url, 
-                headers={'User-Agent': 'Mozilla/5.0'}
-            )
-            with urllib.request.urlopen(req) as response:
-                im = Image.open(response)
+            # --- IMAGE FETCHING (with improved error handling and SSL fix) ---
+            im = None
+            try:
+                # Create a request with a user-agent header
+                req = urllib.request.Request(
+                    artwork_url, 
+                    headers={'User-Agent': 'Mozilla/5.0'}
+                )
+                
+                ssl_context = ssl._create_unverified_context()
 
+                with urllib.request.urlopen(req, context=ssl_context) as response:
+                    im = Image.open(response)
+            
+            except urllib.error.URLError as e:
+                print(f"ERROR: Network error fetching image from {artwork_url}. Reason: {e}")
+                return
+            except Image.UnidentifiedImageError:
+                print(f"ERROR: Could not identify image from {artwork_url}. The URL likely returned non-image data (e.g., an error page).")
+                return
+            except Exception as e:
+                print(f"ERROR: An unexpected error occurred while fetching image from {artwork_url}: {e}")
+                return
+
+            # --- IMAGE PROCESSING AND MQTT PUBLISHING ---
             background = transform_background(im)
             thumbnail = transform_thumbnail(im)
             im_txt = main_image(track_name, artist_names, thumbnail, background)
@@ -228,27 +248,39 @@ class PlaybackManager:
             if self.mqtt_client:
                 self.mqtt_client.publish(MQTT_TOPIC, json.dumps(payload), qos=1, retain=True)
                 print(f"Published update to MQTT topic '{MQTT_TOPIC}'")
-        except Exception as e:
-            print(f"Error during image creation or MQTT publish: {e}")
 
-    # --- Main Control Logic ---
+        except Exception as e:
+            # This outer catch handles errors from image transformations, saving, or MQTT publishing
+            print(f"Error during image processing or MQTT publish: {e}")
+
     def handle_mqtt_status_update(self, _client, _userdata, msg):
-        """Callback for the MQTT client to trigger a forced poll."""
+        """
+        Callback for MQTT status topic. Caches the received playback status
+        and triggers a forced poll to re-evaluate the active source. This
+        allows MQTT to act as a third source of playback info.
+        """
         try:
             payload_str = msg.payload.decode('utf-8')
             payload = json.loads(payload_str)
             if DEBUG:
                 print(f"MQTT Status Received: {payload.get('title')} by {payload.get('artist')}")
 
-            new_title = payload.get('title')
-            new_artist = payload.get('artist')
+            # Extract data from MQTT payload, providing sensible defaults.
+            # The artwork URL key 'album_art_url' is based on the original script's logic.
+            track_name = payload.get('title', 'Unknown Title')
+            artist_names = payload.get('artist', 'Unknown Artist')
+            artwork_url = payload.get('album_art_url', "https://placehold.co/400x400?text=No+image")
+            
+            # Cache the data from this third-party source
+            self.mqtt_data_cache = (artwork_url, track_name, artist_names)
 
-            # --- IMPLEMENTED FEATURE: Force a poll if track or artist changed ---
-            if new_title != self.last_mqtt_title or new_artist != self.last_mqtt_artist:
-                print(">>> Significant change in MQTT status detected. Forcing poll on next update cycle.")
+            # Check if this represents a significant change to trigger a poll.
+            # This helps the system react quickly if Spotify/Jellyfin were playing and just stopped.
+            if track_name != self.last_mqtt_title or artist_names != self.last_mqtt_artist:
+                print(">>> Change in MQTT status detected. Forcing poll on next update cycle.")
                 self._force_poll = True
-                self.last_mqtt_title = new_title
-                self.last_mqtt_artist = new_artist
+                self.last_mqtt_title = track_name
+                self.last_mqtt_artist = artist_names
         except json.JSONDecodeError:
             print(f"Received invalid JSON on MQTT status topic: {msg.payload}")
         except Exception as e:
@@ -274,20 +306,24 @@ class PlaybackManager:
                 self._poll_jellyfin()
 
         # --- Step 2: Process cached data and update image if needed ---
-        # Priority: Spotify > Jellyfin > Nothing
+        # Priority: Spotify > Jellyfin > MQTT > Nothing
         if self.spotify_data_cache:
             artwork_url, track, artist = self.spotify_data_cache
             self._process_playback_data(artwork_url, track, artist)
+            self.mqtt_data_cache = None  # Spotify is active, it overrides MQTT.
         elif self.jellyfin_data_cache:
             artwork_url, track, artist = self.jellyfin_data_cache
             self._process_playback_data(artwork_url, track, artist)
+            self.mqtt_data_cache = None  # Jellyfin is active, it overrides MQTT.
+        elif self.mqtt_data_cache:
+            artwork_url, track, artist = self.mqtt_data_cache
+            self._process_playback_data(artwork_url, track, artist)
         else:
-            # --- FEATURE: Handle "Not Playing" state explicitly ---
+            # Handle "Not Playing" state explicitly
             self._process_playback_data(
                 "https://placehold.co/400x400/222326/FFFFFF?text=Not+Playing",
                 "Not Playing", ""
             )
-
 
 # --- SETUP FUNCTIONS (Mostly unchanged but adapted for the Manager class) ---
 def setup_spotify_client():
