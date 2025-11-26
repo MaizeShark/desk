@@ -29,7 +29,8 @@ def on_connect(client, userdata, flags, rc, properties=None):
             ("music/control/position", 1),
             ("music/control/playpause", 1),
             ("music/control/next", 1),
-            ("music/control/previous", 1)
+            ("music/control/previous", 1),
+            ("music/control/volume", 1)
         ]
         client.subscribe(topics_to_subscribe)
 
@@ -112,12 +113,31 @@ def handle_previous_track(bus, active_service_name, payload):
     """Handler for the 'music/control/previous' topic."""
     player_control(bus, active_service_name, "Previous")
 
+def handle_volume(bus, active_service_name, payload):
+    """Handler for the 'music/control/volume' topic."""
+    try:
+        volume_level = float(payload.decode())
+        if not (0 <= volume_level <= 100):
+            raise ValueError("Volume must be between 0 and 100")
+        
+        player_short_name = active_service_name.replace('org.mpris.MediaPlayer2.', '')
+        try:
+            proxy = bus.get(active_service_name, '/org/mpris/MediaPlayer2')
+            player_interface = proxy['org.mpris.MediaPlayer2.Player']
+            player_interface.Volume = volume_level / 100.0
+            logging.info(f"Set volume of {player_short_name} to {volume_level:.2f}.")
+        except Exception as e:
+            logging.error(f"Failed to set volume for {player_short_name}: {e}")
+    except (ValueError, TypeError) as e:
+        logging.error(f"Invalid volume value received ('{payload.decode()}'): {e}")
+
 # --- A dictionary mapping topics to their handler functions ---
 TOPIC_HANDLERS = {
     "music/control/position": handle_set_position,
     "music/control/playpause": handle_play_pause,
     "music/control/next": handle_next_track,
-    "music/control/previous": handle_previous_track
+    "music/control/previous": handle_previous_track,
+    "music/control/volume": handle_volume
 }
 
 def get_player_info(bus, service_name):
